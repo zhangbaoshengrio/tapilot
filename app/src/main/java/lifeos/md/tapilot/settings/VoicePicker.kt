@@ -16,7 +16,7 @@ internal fun VoicePicker(provider: String, speaker: String, zh: Boolean, enabled
     fun label(a: String, b: String) = if (zh) a else b
     val selected = voices.firstOrNull { it.id == speaker }
     ExposedDropdownMenuBox(expanded = expanded && enabled, onExpandedChange = { if (enabled) expanded = it }) {
-        OutlinedTextField(
+        SettingsField(
             value = selected?.label(zh) ?: label("自定义音色", "Custom voice"), onValueChange = {},
             readOnly = true, enabled = enabled, singleLine = true,
             label = { Text(label("音色", "Voice")) },
@@ -34,7 +34,7 @@ internal fun VoicePicker(provider: String, speaker: String, zh: Boolean, enabled
     }
     if (custom) AlertDialog(onDismissRequest = { custom = false },
         title = { Text(label("自定义音色", "Custom voice")) },
-        text = { OutlinedTextField(customId, { customId = it }, singleLine = true,
+        text = { SettingsField(customId, { customId = it }, singleLine = true,
             label = { Text(label("音色 ID", "Voice ID")) }) },
         confirmButton = { TextButton(enabled = customId.trim().matches(Regex("[A-Za-z0-9_-]{1,160}")), onClick = {
             onSelect(customId.trim()); custom = false

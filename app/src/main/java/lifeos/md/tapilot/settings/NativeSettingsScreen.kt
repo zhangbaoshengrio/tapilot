@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -54,13 +55,36 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
     var clearHistory by remember { mutableStateOf(false) }
     var floating by remember { mutableStateOf(FloatingBallPreferences.isEnabled(activity)) }
     var edge by remember { mutableStateOf(EdgeEffectPreferences.get(activity)) }
+    var page by remember { mutableStateOf("") }
+    var effort by remember { mutableStateOf(lifeos.md.tapilot.chatgpt.ChatGptResponses.reasoningEffort) }
     val busy = coordinator.settingsBusy
     TapilotTheme(dark, paletteId) {
         ThemeBackdrop(dark) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
-            Header(label("设置", "Settings")) { coordinator.back() }
+            androidx.activity.compose.BackHandler(enabled = page.isNotEmpty()) { page = "" }
+            val pageTitle = when (page) {
+                "model" -> label("模型", "Model"); "wireless" -> label("无线控制", "Wireless control"); "voice" -> label("语音", "Voice")
+                "appearance" -> label("外观与语言", "Appearance & language"); "device" -> label("设备控制", "Device control")
+                "tasks" -> label("任务与记录", "Tasks & history"); "about" -> label("关于", "About"); else -> label("设置", "Settings")
+            }
+            Header(pageTitle) { if (page.isNotEmpty()) page = "" else coordinator.back() }
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                Group(label("模型接入方式", "Model connection")) {
+                if (page.isEmpty()) {
+                    MenuCard {
+                        MenuRow("sparkle", label("模型", "Model"), if (coordinator.data.optBoolean("chatgptConversation")) "ChatGPT" else "API Key") { page = "model" }
+                        MenuRow("wifi", label("无线控制", "Wireless control")) { page = "wireless" }
+                    }
+                    MenuCard {
+                        MenuRow("waveform", label("语音", "Voice")) { page = "voice" }
+                        MenuRow("sun", label("外观与语言", "Appearance & language")) { page = "appearance" }
+                    }
+                    MenuCard {
+                        MenuRow("phone", label("设备控制", "Device control")) { page = "device" }
+                        MenuRow("clock", label("任务与记录", "Tasks & history")) { page = "tasks" }
+                        MenuRow("info", label("关于", "About")) { page = "about" }
+                    }
+                }
+                if (page == "model") Group(label("模型接入方式", "Model connection")) {
                     val useChatGpt = coordinator.data.optBoolean("chatgptConversation")
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FilterChip(selected = useChatGpt,
@@ -75,15 +99,22 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                     Text(label("切换后，对话和手机操作使用所选方式。两种方式的配置会分别保留。",
                         "Conversation and phone operations use the selected connection. Both configurations are saved separately."), fontSize = 12.sp)
                 }
-                if (coordinator.data.optBoolean("chatgptConversation")) Group("ChatGPT (SIWC)") { ChatGptSettingsSection(coordinator, zh) }
-                if (!coordinator.data.optBoolean("chatgptConversation")) Group(label("Midscene 模型", "Midscene model")) {
+                if (page == "model" && coordinator.data.optBoolean("chatgptConversation")) Group("ChatGPT (SIWC)") { ChatGptSettingsSection(coordinator, zh) }
+                if (page == "model" && coordinator.data.optBoolean("chatgptConversation")) Group(label("思考强度", "Thinking level")) {
+                    SettingRow(label("规划思考强度", "Planning effort"), when (effort) {
+                        "medium" -> label("中", "Medium"); "high" -> label("高", "High"); else -> label("低（更快）", "Low (faster)") }) { picker = "effort" }
+                    Text(label("控制 AI 在每次规划前思考多久。越低越快，越高越细致。手机截图步骤本身已使用最低思考强度。",
+                        "How long the AI thinks before each planning step. Lower is faster, higher is more careful. Screenshot steps already use minimal thinking."),
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (page == "model" && !coordinator.data.optBoolean("chatgptConversation")) Group(label("Midscene 模型", "Midscene model")) {
                     SettingRow(label("服务商", "Provider"), coordinator.preset) { if (!busy) picker = "model" }
                     listOf("baseUrl" to "API 地址", "modelName" to "模型名称", "modelFamily" to "模型系列").forEach { (field, title) ->
                         val en = when (field) { "baseUrl" -> "API URL"; "modelName" -> "Model name"; else -> "Model family" }
-                        OutlinedTextField(value = model.optString(field), onValueChange = { model = JSONObject(model.toString()).put(field, it) },
+                        SettingsField(value = model.optString(field), onValueChange = { model = JSONObject(model.toString()).put(field, it) },
                             label = { Text(label(title, en)) }, singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
                     }
-                    OutlinedTextField(apiKey, { apiKey = it }, label = { Text("API Key") },
+                    SettingsField(apiKey, { apiKey = it }, label = { Text("API Key") },
                         placeholder = { Text(if (coordinator.hasKey(coordinator.preset)) label("已保存；留空保留", "Saved; leave empty to retain") else label("输入 API Key", "Enter API Key")) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         visualTransformation = PasswordVisualTransformation(), singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
@@ -94,12 +125,12 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                     }
                     if (coordinator.settingsSection == "model") Status(coordinator.settingsStatus)
                 }
-                Group(label("ChatGPT 无线控制", "ChatGPT wireless control")) { WirelessControlSettings(activity, zh) }
-                Group(label("语音输入", "Voice input")) {
+                if (page == "wireless") Group(label("ChatGPT 无线控制", "ChatGPT wireless control")) { WirelessControlSettings(activity, zh) }
+                if (page == "voice") Group(label("语音输入", "Voice input")) {
                     SettingRow(label("转写服务", "Provider"), if (provider == "volcengine") label("火山引擎", "Volcengine") else "Deepgram") { if (!busy) picker = "speech" }
                     Text(if (provider == "volcengine") label("Seed ASR 2.0 小时版 · API 接入", "Seed ASR 2.0 duration · API") else "Deepgram Nova-3 · API", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SpeechApiKeyHelp(provider, zh)
-                    OutlinedTextField(speechKey, { speechKey = it }, label = { Text("API Key") },
+                    SettingsField(speechKey, { speechKey = it }, label = { Text("API Key") },
                         placeholder = { Text(if (coordinator.hasKey("speech-$provider")) label("已保存；留空保留", "Saved; leave empty to retain") else label("输入 API Key", "Enter API Key")) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                         visualTransformation = PasswordVisualTransformation(), singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
@@ -112,11 +143,11 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                     }
                     if (coordinator.settingsSection == "speech") Status(coordinator.settingsStatus)
                 }
-                Group(label("语音对话与播报", "Voice conversation & playback")) { VoiceOutputSettingsSection(activity, zh, provider) }
-                Group(label("语音润色", "Voice polishing")) { SpeechPolishSettingsSection(activity, zh,
+                if (page == "voice") Group(label("语音对话与播报", "Voice conversation & playback")) { VoiceOutputSettingsSection(activity, zh, provider) }
+                if (page == "voice") Group(label("语音润色", "Voice polishing")) { SpeechPolishSettingsSection(activity, zh,
                     coordinator.data.optBoolean("chatgptConversation"), coordinator.chatGpt.model) }
-                if (coordinator.settingsSection == "general") Status(coordinator.settingsStatus)
-                Group(label("外观与语言", "Appearance & language")) {
+                if (page.isNotEmpty() && coordinator.settingsSection == "general") Status(coordinator.settingsStatus)
+                if (page == "appearance") Group(label("外观与语言", "Appearance & language")) {
                     ThemePalettePicker(paletteId, zh) { id ->
                         AppTheme.setPalette(activity, id); paletteId = id; onThemeChanged()
                     }
@@ -125,7 +156,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                     }) { picker = "theme" }
                     SettingRow(label("语言", "Language"), activity.getSharedPreferences("midscene-preferences", 0).getString("language", "system").orEmpty()) { picker = "language" }
                 }
-                Group(label("全局助手", "Global assistant")) {
+                if (page == "device") Group(label("全局助手", "Global assistant")) {
                     ToggleRow(label("悬浮球", "Floating assistant"), floating) { value ->
                         services.call("app.setFloatingBallEnabled", JSONObject().put("enabled", value)) { result -> if (result.isSuccess) floating = value }
                     }
@@ -142,6 +173,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                     SettingRow(label("后台运行", "Background operation"), label("电池设置", "Battery settings")) { coordinator.settingsCall("app.openBatterySettings") }
                     Text(label("若系统会关闭后台任务，请将 Tapilot 的电池使用设为不受限制。", "If background tasks are interrupted, allow unrestricted battery use for Tapilot."), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     SettingRow(label("执行边框", "Execution border"), edge.mode.wireValue) { picker = "edge" }
+                    SettingRow(label("手势预览", "Gesture preview"), label("播放", "Play")) { services.call("app.previewGestures", JSONObject()) {} }
                     if (edge.mode == EdgeEffectGeometryMode.CUSTOM) {
                         Text(label("圆角 ${edge.cornerRadiusDp.toInt()} dp", "Radius ${edge.cornerRadiusDp.toInt()} dp"), fontSize = 13.sp)
                         Slider(edge.cornerRadiusDp, { edge = edge.copy(cornerRadiusDp = it) }, valueRange = 0f..64f,
@@ -151,13 +183,13 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                             onValueChangeFinished = { saveEdge(services, edge) })
                     }
                 }
-                Group(label("任务与记录", "Tasks & history")) {
+                if (page == "tasks") Group(label("任务与记录", "Tasks & history")) {
                     AgentLimitSettings(coordinator, zh)
                     ToggleRow(label("高级 YAML 模式", "Advanced YAML mode"), coordinator.data.optBoolean("advanced")) { coordinator.preference("advanced", it) }
                     SettingRow(label("清空聊天记录", "Clear chat history"), "") { clearHistory = true }
                     SettingRow(label("检查执行引擎", "Check execution engine"), "") { coordinator.settingsCall("runtime.doctor") }
                 }
-                if (activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
+                if (page == "tasks" && activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0) {
                     Group(label("开发实验", "Developer experiments")) {
                         SettingRow(label("后台屏幕（实验性）", "Background screen (Experimental)"), label("默认关闭", "Off by default")) {
                             activity.startActivity(android.content.Intent().setClassName(activity,
@@ -165,7 +197,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                         }
                     }
                 }
-                Group(label("关于 Tapilot", "About Tapilot")) { AppUpdateSettings(activity, zh) }
+                if (page == "about") Group(label("关于 Tapilot", "About Tapilot")) { AppUpdateSettings(activity, zh) }
             }
         }
         }
@@ -175,6 +207,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                 "speech" -> listOf("volcengine", "deepgram")
                 "theme" -> listOf("system", "light", "dark")
                 "language" -> listOf("system", "zh", "en")
+                "effort" -> listOf("low", "medium", "high")
                 else -> listOf("auto", "square", "custom")
             }
             AlertDialog(onDismissRequest = { picker = "" }, title = { Text(label("选择", "Choose")) }, text = {
@@ -183,6 +216,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                         "system" -> label("跟随系统", "System"); "light" -> label("浅色", "Light"); "dark" -> label("深色", "Dark")
                         "zh" -> "简体中文"; "en" -> "English"; "auto" -> label("自动检测", "Automatic")
                         "square" -> label("直角", "Square"); "custom" -> label("自定义", "Custom")
+                        "low" -> label("低（更快）", "Low (faster)"); "medium" -> label("中", "Medium"); "high" -> label("高（更慢更细致）", "High (slower, more careful)")
                         "volcengine" -> label("火山引擎", "Volcengine"); "doubao" -> label("豆包", "Doubao"); "qwen" -> label("通义千问", "Qwen"); else -> choice
                     }
                     Text(title, Modifier.fillMaxWidth().clickable {
@@ -191,6 +225,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                             "speech" -> { provider = choice; speechKey = "" }
                             "theme" -> { AppTheme.set(activity, choice); mode = choice; onThemeChanged() }
                             "language" -> if (AppLanguage.set(activity, choice)) onLanguageChanged()
+                            "effort" -> { lifeos.md.tapilot.chatgpt.ChatGptResponses.saveEffort(activity, choice); effort = choice }
                             "edge" -> { edge = edge.copy(mode = EdgeEffectGeometryMode.fromWireValue(choice)); saveEdge(services, edge) }
                         }; picker = ""
                     }.padding(vertical = 14.dp))
@@ -216,29 +251,54 @@ private fun saveEdge(services: ServiceGateway, value: EdgeEffectGeometrySettings
 }
 
 @Composable private fun Header(title: String, back: () -> Unit) {
-    Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).statusBarsPadding().height(56.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        TextButton(onClick = back) { Text("‹", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface) }
-        Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+    // ChatGPT style: no bar, a floating round back button and a centred title.
+    Box(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 14.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.align(Alignment.CenterStart).size(44.dp)
+            .shadow(4.dp, androidx.compose.foundation.shape.CircleShape)
+            .background(MaterialTheme.colorScheme.surface, androidx.compose.foundation.shape.CircleShape)
+            .clickable(onClick = back), contentAlignment = Alignment.Center) {
+            Text("‹", fontSize = 26.sp, color = MaterialTheme.colorScheme.onSurface)
+        }
+        Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
     }
 }
+/** A rounded card holding menu rows, separated by hairlines (ChatGPT settings style). */
+@Composable private fun MenuCard(content: @Composable ColumnScope.() -> Unit) {
+    Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+        Column(Modifier.fillMaxWidth(), content = content)
+    }
+}
+@Composable private fun ColumnScope.MenuRow(icon: String, title: String, value: String = "", click: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().clickable(onClick = click).heightIn(min = 64.dp).padding(horizontal = 18.dp), verticalAlignment = Alignment.CenterVertically) {
+        lifeos.md.tapilot.chat.ChatIcon(icon, colors.onSurface, Modifier.size(26.dp))
+        Text(title, Modifier.weight(1f).padding(start = 16.dp), fontSize = 17.sp, fontWeight = FontWeight.Medium)
+        if (value.isNotEmpty()) Text(value, fontSize = 16.sp, color = colors.onSurfaceVariant)
+        Spacer(Modifier.width(6.dp))
+        lifeos.md.tapilot.chat.ChatIcon("chevron", colors.onSurfaceVariant, Modifier.size(18.dp))
+    }
+    HorizontalDivider(color = colors.outlineVariant.copy(alpha = .6f))
+}
 @Composable private fun Group(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(title, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title, Modifier.padding(horizontal = 8.dp), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
         Surface(shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surface,
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), shadowElevation = 2.dp) {
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
         }
     }
 }
 @Composable private fun SettingRow(title: String, value: String, click: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = click).heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Text(title, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Medium)
         Text(value, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(" ›", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.width(6.dp))
+        lifeos.md.tapilot.chat.ChatIcon("chevron", MaterialTheme.colorScheme.onSurfaceVariant, Modifier.size(18.dp))
     }
 }
 @Composable private fun ToggleRow(title: String, value: Boolean, changed: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(title, Modifier.weight(1f), fontSize = 16.sp, fontWeight = FontWeight.SemiBold); Switch(value, changed) }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(title, Modifier.weight(1f), fontSize = 17.sp, fontWeight = FontWeight.Medium); Switch(value, changed) }
 }
 
 @Composable fun NativeAdvancedScreen(coordinator: NativeConversationCoordinator) {
@@ -246,7 +306,7 @@ private fun saveEdge(services: ServiceGateway, value: EdgeEffectGeometrySettings
     TapilotTheme(coordinator.dark) {
         Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).navigationBarsPadding().imePadding()) {
             Header("YAML") { coordinator.back() }
-            OutlinedTextField(source, { source = it; coordinator.preference("yaml", it) }, modifier = Modifier.weight(1f).fillMaxWidth().padding(20.dp), label = { Text("YAML") })
+            SettingsField(source, { source = it; coordinator.preference("yaml", it) }, modifier = Modifier.weight(1f).fillMaxWidth().padding(20.dp), label = { Text("YAML") })
             Button(onClick = { coordinator.executeYaml(source) }, enabled = source.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(20.dp)) { Text(if (!coordinator.chinese) "Run" else "执行") }
         }
     }
@@ -260,10 +320,10 @@ private fun saveEdge(services: ServiceGateway, value: EdgeEffectGeometrySettings
 @Composable
 private fun CompactPrimaryAction(title: String, enabled: Boolean, click: () -> Unit) {
     Box(Modifier.heightIn(min = 48.dp), contentAlignment = Alignment.Center) {
-        Button(onClick = click, enabled = enabled, modifier = Modifier.height(36.dp),
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
-            Text(title, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Button(onClick = click, enabled = enabled, modifier = Modifier.height(40.dp),
+            shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -295,7 +355,7 @@ private fun ThemePalettePicker(selected: String, zh: Boolean, changed: (String) 
                 }
             }
         }
-        Text(if (selected == "minimal") { if (zh) "纯白底色，柔绿点缀。" else "White surfaces with soft green accents." }
+        Text(if (selected == "minimal") { if (zh) "ChatGPT 风格：浅灰底、黑色点缀。" else "ChatGPT style: soft gray surfaces with black accents." }
             else { if (zh) "柔和纸色，淡紫点缀。" else "Warm paper tones with lavender accents." },
             fontSize = 12.sp, lineHeight = 18.sp, color = colors.onSurfaceVariant)
     }

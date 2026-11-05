@@ -39,8 +39,8 @@ internal fun MessageBubble(message: ChatMessage, zh: Boolean, controller: ChatCo
     val colors = MaterialTheme.colorScheme
     val palette = LocalThemePalette.current
     val bubbleColor = Color(if (user) palette.bubbleStart else palette.assistantBubble)
-    val bubbleShape = if (user) RoundedCornerShape(20.dp, 20.dp, 8.dp, 20.dp)
-        else RoundedCornerShape(20.dp, 20.dp, 20.dp, 8.dp)
+    // ChatGPT style: user messages in a soft gray pill-bubble, assistant replies as plain text without a bubble.
+    val bubbleShape = RoundedCornerShape(22.dp)
     val context = LocalContext.current
     var menu by remember(message.id) { mutableStateOf(false) }
     var details by remember(message.id) { mutableStateOf(false) }
@@ -52,17 +52,16 @@ internal fun MessageBubble(message: ChatMessage, zh: Boolean, controller: ChatCo
         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("Tapilot", message.text))
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-    val bubbleWidth = maxWidth * if (user) .82f else .92f
+    val bubbleWidth = maxWidth * if (user) .82f else 1f
     Row(Modifier.fillMaxWidth(), horizontalArrangement = if (user) Arrangement.End else Arrangement.Start) {
         Column(Modifier.widthIn(max = bubbleWidth)
-            .background(bubbleColor, bubbleShape)
-            .border(1.dp, colors.outlineVariant, bubbleShape)
+            .then(if (user) Modifier.background(bubbleColor, bubbleShape) else Modifier)
             .combinedClickable(onClick = {}, onLongClick = { menu = true })
-            .padding(horizontal = 14.dp, vertical = 12.dp)) {
+            .padding(horizontal = if (user) 16.dp else 4.dp, vertical = if (user) 10.dp else 4.dp)) {
             val text = if (!user && message.status == "running") (if (zh) "正在处理…" else "Working…")
                 else if (quotaFailure && !details) (if (zh) "模型账户欠费，请充值或在设置中选择可用的模型 API。" else "The model account is overdue. Check your model settings.")
                 else message.text.ifBlank { if (zh) "任务已结束" else "Task finished" }
-            if (user) Text(text, color = Color(palette.bubbleText), fontSize = 15.sp, lineHeight = 22.sp)
+            if (user) Text(text, color = Color(palette.bubbleText), fontSize = 17.sp, lineHeight = 24.sp)
             else ReplyContentView(text, message.id, zh)
             if (!user) message.task?.let { TaskDetailsView(it, zh) }
             message.attachment?.let {
@@ -71,22 +70,27 @@ internal fun MessageBubble(message: ChatMessage, zh: Boolean, controller: ChatCo
                 }
             }
             if (!user && message.status != "running") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (message.text.isNotBlank()) TextButton(onClick = { controller.readReply(message) }, enabled = !controller.voiceState.active && !controller.recording && !controller.transcribing,
-                        contentPadding = PaddingValues(0.dp)) {
-                        Text(if (controller.speakingId == message.id) (if (zh) "停止播报" else "Stop voice") else (if (zh) "朗读" else "Read aloud"), fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val tint = colors.onSurfaceVariant
+                    if (message.text.isNotBlank()) IconButton(onClick = { controller.readReply(message) }, modifier = Modifier.size(40.dp),
+                        enabled = !controller.voiceState.active && !controller.recording && !controller.transcribing) {
+                        ChatIcon(if (controller.speakingId == message.id) "stop" else "speaker", if (controller.speakingId == message.id) colors.primary else tint,
+                            Modifier.size(20.dp), if (controller.speakingId == message.id) (if (zh) "停止播报" else "Stop voice") else (if (zh) "朗读" else "Read aloud"))
                     }
-                    TextButton(onClick = { copy() }, contentPadding = PaddingValues(0.dp)) {
-                        Text(if (zh) "复制" else "Copy", fontSize = 12.sp, color = colors.onSurfaceVariant)
+                    IconButton(onClick = { copy() }, modifier = Modifier.size(40.dp)) {
+                        ChatIcon("copy", tint, Modifier.size(20.dp), if (zh) "复制" else "Copy")
                     }
-                    TextButton(onClick = { if (failed) controller.command("retry", id = message.entryId) else rerun = true },
-                        enabled = !busy, contentPadding = PaddingValues(0.dp)) {
-                        Text(if (zh) (if (failed) "重试" else "重新执行") else "Retry", fontSize = 12.sp)
+                    if (message.text.isNotBlank()) IconButton(onClick = { shareText(context, message.text) }, modifier = Modifier.size(40.dp)) {
+                        ChatIcon("share", tint, Modifier.size(20.dp), if (zh) "分享" else "Share")
+                    }
+                    IconButton(onClick = { if (failed) controller.command("retry", id = message.entryId) else rerun = true },
+                        enabled = !busy, modifier = Modifier.size(40.dp)) {
+                        ChatIcon("refresh", tint, Modifier.size(20.dp), if (zh) (if (failed) "重试" else "重新执行") else "Retry")
                     }
                     if (message.reportId.isNotEmpty()) TextButton(onClick = {
                         if (message.reports.size > 1) reportPicker = true else controller.command("report", id = message.reportId)
-                    }, contentPadding = PaddingValues(0.dp)) {
-                        Text(if (zh) "执行记录 →" else "Activity →", fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                    }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                        Text(if (zh) "执行记录 →" else "Activity →", fontSize = 13.sp, fontWeight = FontWeight.Medium, color = tint)
                     }
                 }
             }

@@ -19,7 +19,7 @@ data class ChatReport(val id: String, val title: String) {
         }
     }
 }
-data class ChatConversation(val id: String, val title: String)
+data class ChatConversation(val id: String, val title: String, val pinned: Boolean = false)
 data class ChatAttachment(val name: String, val kind: String, val preview: String = "",
     val id: String = "", val text: String = "", val images: List<String> = emptyList(), val pageCount: Int = 0) {
     companion object {

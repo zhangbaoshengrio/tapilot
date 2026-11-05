@@ -38,7 +38,7 @@ internal fun AgentLimitSettings(coordinator: NativeConversationCoordinator, zh: 
                     Text(label("启用上限", "Enable limit"), Modifier.weight(1f))
                     Switch(enabled, { enabled = it })
                 }
-                if (enabled) OutlinedTextField(number, { number = it }, singleLine = true,
+                if (enabled) SettingsField(number, { number = it }, singleLine = true,
                     label = { Text(label("上限数目", "Maximum count")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     isError = parsed == null, supportingText = { if (parsed == null) Text(label("请输入 1–2147483647 的整数", "Enter an integer from 1 to 2147483647")) })
                 else Text(label("关闭后不限制次数，任务仍可手动停止。", "With the limit disabled, you can still stop the task manually."), fontSize = 13.sp)

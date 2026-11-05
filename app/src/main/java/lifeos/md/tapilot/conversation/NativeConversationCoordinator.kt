@@ -55,6 +55,7 @@ class NativeConversationCoordinator(
     } }
     private val credentials = ModelCredentialStore(activity)
     private val pi = NativePiConversation(activity)
+    init { lifeos.md.tapilot.chatgpt.ChatGptResponses.loadEffort(activity) }
     val chatGpt = lifeos.md.tapilot.chatgpt.ChatGptConnection(activity) { if (ready) publish() }
     private val execution = TaskExecution()
     private val activeTaskId get() = execution.taskId
@@ -131,6 +132,14 @@ class NativeConversationCoordinator(
     private fun history() = data.getJSONArray("history").objects()
     private fun conversation(entry: JSONObject) = entry.optString("conversationId", entry.optString("id"))
     private fun active() = data.getString("active")
+    private fun conversationMeta(id: String, change: (JSONObject) -> Unit) {
+        if (id.isBlank()) return
+        val all = data.optJSONObject("conversationMeta") ?: JSONObject().also { data.put("conversationMeta", it) }
+        val entry = all.optJSONObject(id) ?: JSONObject().also { all.put(id, it) }
+        change(entry)
+        if (entry.length() == 0 || (!entry.optBoolean("pinned") && entry.optString("title").isBlank())) all.remove(id)
+        save()
+    }
     private fun local(zh: String, en: String) = if (AppLanguage.resolved(activity) == "zh") zh else en
     fun publish() {
         if (closed) return
@@ -153,11 +162,15 @@ class NativeConversationCoordinator(
         }.sortedBy { it.first }.map { it.second }
         // Build each conversation once; repeated capture progress must not scan
         // the entire history for every sidebar entry.
+        val meta = data.optJSONObject("conversationMeta") ?: JSONObject()
         val conversations = history.sortedByDescending { it.optLong("createdAt") }
             .groupBy(::conversation).map { (id, entries) ->
                 val first = entries.minBy { it.optLong("createdAt") }
-                ChatConversation(id, first.optString("inputText", first.optString("source")).take(28).ifBlank { local("新对话", "New conversation") })
-            }.toMutableList()
+                val custom = meta.optJSONObject(id)
+                ChatConversation(id,
+                    custom?.optString("title").orEmpty().ifBlank { first.optString("inputText", first.optString("source")).take(28).ifBlank { local("新对话", "New conversation") } },
+                    custom?.optBoolean("pinned") == true)
+            }.sortedByDescending { it.pinned }.toMutableList()
         if (conversations.none { it.id == active() }) conversations.add(0, ChatConversation(active(), local("新对话", "New conversation")))
         val model = profile()
         emit(ChatState(ready = ready, language = AppLanguage.resolved(activity), dark = AppTheme.isDark(activity), paletteId = AppTheme.paletteId(activity),
@@ -221,6 +234,21 @@ class NativeConversationCoordinator(
                 "advanced" -> if (!running && data.optBoolean("advanced")) { messageLoads.discard(); advancedOpen = true }
                 "new" -> if (!running) { messageLoads.discard(); panelResumeId = null; data.put("active", "chat-${UUID.randomUUID()}"); preview = null; save() }
                 "select" -> if (!running && history().any { conversation(it) == value.optString("id") }) { messageLoads.discard(); panelResumeId = null; data.put("active", value.getString("id")); preview = null; save() }
+                "pinConversation" -> conversationMeta(value.optString("id")) { it.put("pinned", !it.optBoolean("pinned")) }
+                "renameConversation" -> conversationMeta(value.optString("id")) { meta ->
+                    val title = value.optString("text").trim().take(60)
+                    if (title.isBlank()) meta.remove("title") else meta.put("title", title)
+                }
+                "deleteConversation" -> if (!running) {
+                    val id = value.optString("id")
+                    if (id.isNotBlank()) {
+                        messageLoads.discard(); preview = null
+                        data.put("history", JSONArray(history().filter { conversation(it) != id }))
+                        data.optJSONObject("conversationMeta")?.remove(id)
+                        if (active() == id) { panelResumeId = null; data.put("active", "chat-${UUID.randomUUID()}") }
+                        save()
+                    }
+                }
                 "attachment", "removeAttachment" -> {
                     messageLoads.discard(MessageLoadAction.EDIT); messageLoads.discard(MessageLoadAction.PREVIEW)
                     pendingAttachment = if (action == "attachment") value.getJSONObject("attachment") else null; save()

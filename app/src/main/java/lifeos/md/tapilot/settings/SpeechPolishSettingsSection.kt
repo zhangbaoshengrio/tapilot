@@ -64,11 +64,11 @@ internal fun SpeechPolishSettingsSection(context: Context, zh: Boolean, useChatG
         if (settings.enabled) {
             if (useChatGpt) Text("ChatGPT · ${chatGptModel.ifBlank { label("请先登录并选择模型", "Sign in and choose a model") }}", fontSize = 14.sp)
             else {
-            OutlinedTextField(settings.baseUrl, { settings = settings.copy(baseUrl = it); edited = true },
+            SettingsField(settings.baseUrl, { settings = settings.copy(baseUrl = it); edited = true },
                 label = { Text("Base URL") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
-            OutlinedTextField(settings.model, { settings = settings.copy(model = it); edited = true },
+            SettingsField(settings.model, { settings = settings.copy(model = it); edited = true },
                 label = { Text(label("润色模型", "Polishing model")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, autoCorrectEnabled = false), singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
-            OutlinedTextField(key, { key = it; edited = true }, label = { Text(label("润色 API Key", "Polishing API Key")) },
+            SettingsField(key, { key = it; edited = true }, label = { Text(label("润色 API Key", "Polishing API Key")) },
                 placeholder = { Text(if (hasKey) label("已保存；留空保留", "Saved; leave empty to retain") else "API Key") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), visualTransformation = PasswordVisualTransformation(),
                 singleLine = true, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)
@@ -96,9 +96,9 @@ internal fun SpeechPolishSettingsSection(context: Context, zh: Boolean, useChatG
             }) { Text(label(if (checking) "正在试润色…" else "试润色", if (checking) "Testing polishing…" else "Try polishing")) }
             TextButton(onClick = { promptsOpen = !promptsOpen }) { Text(label(if (promptsOpen) "收起提示词" else "自定义提示词", if (promptsOpen) "Hide prompts" else "Customize prompts")) }
             if (promptsOpen) {
-                OutlinedTextField(settings.promptZh, { settings = settings.copy(promptZh = it); edited = true }, label = { Text(label("中文提示词", "Chinese prompt")) }, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                SettingsField(settings.promptZh, { settings = settings.copy(promptZh = it); edited = true }, label = { Text(label("中文提示词", "Chinese prompt")) }, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
                     modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6, shape = MaterialTheme.shapes.medium)
-                OutlinedTextField(settings.promptEn, { settings = settings.copy(promptEn = it); edited = true }, label = { Text(label("英文提示词", "English prompt")) }, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
+                SettingsField(settings.promptEn, { settings = settings.copy(promptEn = it); edited = true }, label = { Text(label("英文提示词", "English prompt")) }, keyboardOptions = KeyboardOptions(autoCorrectEnabled = false),
                     modifier = Modifier.fillMaxWidth(), minLines = 3, maxLines = 6, shape = MaterialTheme.shapes.medium)
                 TextButton(onClick = {
                     val defaults = SpeechPolishSettings()

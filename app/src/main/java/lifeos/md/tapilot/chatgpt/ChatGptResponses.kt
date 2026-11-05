@@ -45,6 +45,7 @@ object ChatGptResponses {
         }
         val body = JSONObject().put("model", model).put("input", input).put("store", false).put("stream", true)
             .put("include", JSONArray().put("reasoning.encrypted_content"))
+            .put("reasoning", JSONObject().put("effort", reasoningEffort))
         if (tools.length() > 0) {
             body.put("parallel_tool_calls", false)
             val functions = JSONArray()
@@ -56,6 +57,20 @@ object ChatGptResponses {
                 .put("description", "Tapilot local task planning and Android phone operations").put("tools", functions)))
         }
         return body
+    }
+    /** How long the conversation planner may think before answering: "low", "medium" or "high". */
+    @Volatile var reasoningEffort: String = "low"
+    private const val EFFORT_KEY = "chatgpt.reasoningEffort"
+
+    fun loadEffort(context: android.content.Context) {
+        reasoningEffort = context.getSharedPreferences("midscene-preferences", android.content.Context.MODE_PRIVATE)
+            .getString(EFFORT_KEY, null)?.takeIf { it in setOf("low", "medium", "high") } ?: "low"
+    }
+
+    fun saveEffort(context: android.content.Context, value: String) {
+        require(value in setOf("low", "medium", "high"))
+        context.getSharedPreferences("midscene-preferences", android.content.Context.MODE_PRIVATE).edit().putString(EFFORT_KEY, value).apply()
+        reasoningEffort = value
     }
     fun params(model: String, token: String, messages: JSONArray, tools: JSONArray): JSONObject = JSONObject()
         .put("url", "${ChatGptOAuth.RESOURCE}/responses").put("method", "POST")

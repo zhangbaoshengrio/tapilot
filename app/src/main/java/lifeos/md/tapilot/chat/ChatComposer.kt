@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import lifeos.md.tapilot.conversation.ExecutionMode
@@ -41,9 +43,11 @@ internal fun ChatComposer(controller: ChatController) {
                 .showSoftInput(field, InputMethodManager.SHOW_IMPLICIT) } }
         }
     }
-    Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp).fillMaxWidth()
-        .clip(RoundedCornerShape(22.dp)).background(colors.surfaceContainerLow)
-        .border(1.dp, colors.outlineVariant, RoundedCornerShape(22.dp))
+    val darkTheme = colors.background.luminance() < .5f
+    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp).fillMaxWidth()
+        .shadow(if (darkTheme) 0.dp else 8.dp, RoundedCornerShape(28.dp), clip = false)
+        .clip(RoundedCornerShape(28.dp)).background(androidx.compose.ui.graphics.Color(lifeos.md.tapilot.theme.LocalThemePalette.current.input))
+        .then(if (darkTheme) Modifier.border(1.dp, colors.outlineVariant, RoundedCornerShape(28.dp)) else Modifier)
         .heightIn(min = 42.dp).padding(horizontal = 8.dp, vertical = 4.dp)) {
         Row(Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -52,7 +56,7 @@ internal fun ChatComposer(controller: ChatController) {
                     modifier = Modifier.size(44.dp)) {
                     ChatIcon("plus", colors.onSurfaceVariant, Modifier.size(20.dp), if (state.chinese) "添加附件" else "Add attachment")
                 }
-                AttachmentDropdown(controller, attachments, onDismiss = { attachments = false })
+                if (attachments) AttachmentSheet(controller, onDismiss = { attachments = false })
             }
             // Match the adjacent buttons so the empty hint shares their vertical center.
             AndroidView(modifier = Modifier.weight(1f).heightIn(min = 44.dp, max = 126.dp), factory = { context ->
@@ -118,19 +122,21 @@ internal fun ChatComposer(controller: ChatController) {
             val interrupt = state.running && controller.draft.isBlank() && state.attachment == null
             val canSend = (state.running && !controller.recording && !controller.transcribing) || (enabled && !controller.recording && (controller.draft.isNotBlank() || state.attachment != null))
             if (!canSend && enabled && !controller.recording && controller.draft.isBlank() && state.attachment == null) {
-                IconButton(onClick = { controller.startVoiceConversation() }, modifier = Modifier.size(44.dp), enabled = state.configured) {
-                    ChatIcon("waveform", colors.onSurfaceVariant, Modifier.size(22.dp), if (state.chinese) "语音对话" else "Voice conversation")
+                IconButton(onClick = { controller.startVoiceConversation() },
+                    modifier = Modifier.size(44.dp).padding(4.dp).clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(androidx.compose.ui.graphics.Color(0xFF3B6CE6)), enabled = state.configured) {
+                    ChatIcon("waveform", androidx.compose.ui.graphics.Color.White, Modifier.size(20.dp), if (state.chinese) "语音对话" else "Voice conversation")
                 }
             }
             if (canSend) {
+                // ChatGPT style: solid round send button.
                 IconButton(onClick = { if (interrupt) controller.command("stop") else controller.send() },
-                    modifier = Modifier.size(44.dp)) {
-                    ChatIcon(if (interrupt) "stop" else "send", colors.onSurface,
-                        Modifier.size(20.dp), if (state.chinese) (if (interrupt) "停止" else "发送") else (if (interrupt) "Stop" else "Send"))
+                    modifier = Modifier.size(44.dp).padding(4.dp).clip(androidx.compose.foundation.shape.CircleShape).background(colors.primary)) {
+                    ChatIcon(if (interrupt) "stop" else "send", colors.onPrimary,
+                        Modifier.size(18.dp), if (state.chinese) (if (interrupt) "停止" else "发送") else (if (interrupt) "Stop" else "Send"))
                 }
             }
         }
-        ExecutionModePicker(controller)
     }
 }
 

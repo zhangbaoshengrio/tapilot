@@ -33,7 +33,7 @@ internal fun ChatGptSettingsSection(coordinator: NativeConversationCoordinator, 
                 if (!open) modelPicker = false
                 else if (!busy) { modelPicker = true; connection.refreshModels() }
             }) {
-                OutlinedTextField(
+                SettingsField(
                     value = connection.models.firstOrNull { it.id == connection.model }?.label
                         ?: connection.model.ifBlank { label("选择模型", "Choose model") },
                     onValueChange = {}, readOnly = true, enabled = !busy, singleLine = true,

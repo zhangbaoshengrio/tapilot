@@ -18,7 +18,7 @@ internal fun ReplyContentView(text: String, messageId: String, zh: Boolean) {
     val parts = remember(text) { replyParts(text) }
     parts.forEachIndexed { index, part ->
         if (part.formattedJson == null) {
-            SelectionContainer { Text(part.text.trim(), fontSize = 15.sp, lineHeight = 22.sp) }
+            SelectionContainer { Text(part.text.trim(), fontSize = 17.sp, lineHeight = 26.sp) }
         } else key(messageId, index, part.text) {
             var expanded by rememberSaveable { mutableStateOf(false) }
             val label = part.operationCount?.let { if (zh) "操作记录 · $it 条" else "Operation records · $it" }

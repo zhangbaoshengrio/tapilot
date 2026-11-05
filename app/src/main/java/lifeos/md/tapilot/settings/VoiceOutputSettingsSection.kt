@@ -50,7 +50,7 @@ internal fun VoiceOutputSettingsSection(context: Context, zh: Boolean, provider:
         Text(if (provider == "volcengine") label("火山引擎 Seed TTS 2.0 · 使用 API 播报", "Volcengine Seed TTS 2.0 · API playback")
             else label("Deepgram Aura-2 · 当前默认音色支持英文", "Deepgram Aura-2 · The default voice speaks English"), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         VoicePicker(provider, speaker, zh, enabled = !busy, onSelect = { speaker = it })
-        OutlinedTextField(key, { key = it }, label = { Text(label("播报 API Key（可选）", "Playback API Key (optional)")) },
+        SettingsField(key, { key = it }, label = { Text(label("播报 API Key（可选）", "Playback API Key (optional)")) },
             placeholder = { Text(if (hasKey) label("已保存；留空保留", "Saved; leave empty to retain") else label("留空使用转写密钥", "Use transcription key when empty")) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), visualTransformation = PasswordVisualTransformation(),
             singleLine = true, enabled = !busy, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium)

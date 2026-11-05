@@ -3,6 +3,11 @@ package lifeos.md.tapilot.chat
 import lifeos.md.tapilot.theme.TapilotTheme
 import lifeos.md.tapilot.theme.tapilotColors
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -35,6 +40,7 @@ fun ChatScreen(controller: ChatController, compact: Boolean = false, voiceConnec
     TapilotTheme(state.dark, state.paletteId) {
       CompositionLocalProvider(LocalContentColor provides colors.onBackground) {
         var sessions by remember { mutableStateOf(false) }
+        var drawer by remember { mutableStateOf(false) }
         val list = rememberLazyListState()
         val busy = state.running || controller.recording || controller.transcribing || controller.picking
         val zh = state.chinese
@@ -44,24 +50,36 @@ fun ChatScreen(controller: ChatController, compact: Boolean = false, voiceConnec
         LaunchedEffect(state.activeConversationId, state.messages.size, state.messages.lastOrNull()?.text, compact, imeBottom, showGuide) {
             if (state.messages.isNotEmpty()) list.animateScrollToItem(state.messages.lastIndex + if (showGuide) 1 else 0)
         }
-        BoxWithConstraints(Modifier.fillMaxSize().background(colors.background)) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(colors.background).drawBehind {
+            // ChatGPT style: a very soft radial glow on the light page.
+            if (colors.background.luminance() > .5f) drawRect(androidx.compose.ui.graphics.Brush.radialGradient(
+                listOf(Color(0xFFFFFFFF), Color(0xFFEFEFEF)), center = Offset(size.width / 2f, size.height * .42f), radius = size.height * .8f))
+        }) {
             Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
-                Row(Modifier.fillMaxWidth().background(colors.surfaceContainerLow).then(if (compact) Modifier else Modifier.statusBarsPadding()).height(56.dp).padding(horizontal = 12.dp),
+                // ChatGPT style: no bar, two floating white controls.
+                Row(Modifier.fillMaxWidth().then(if (compact) Modifier else Modifier.statusBarsPadding()).height(64.dp).padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { controller.command("settings") }, enabled = !busy) {
-                        ChatIcon("settings", colors.onSurfaceVariant, description = label("设置", "Settings"))
+                    Box(Modifier.size(48.dp).shadow(4.dp, CircleShape).background(colors.surface, CircleShape), contentAlignment = Alignment.Center) {
+                        IconButton(onClick = { drawer = true }, enabled = !busy) {
+                            ChatIcon("menu", colors.onSurface, description = label("对话列表", "Chats"))
+                        }
                     }
                     Spacer(Modifier.weight(1f))
                     if (state.running) Text(label("正在处理…", "Working…"),
-                        color = colors.onSurfaceVariant, fontSize = 12.sp)
-                    Box {
-                        IconButton(onClick = { sessions = true }, enabled = !busy) {
-                            ChatIcon("conversations", colors.onSurfaceVariant, description = label("会话管理", "Manage conversations"))
+                        color = colors.onSurfaceVariant, fontSize = 12.sp, modifier = Modifier.padding(end = 10.dp))
+                    Row(Modifier.height(48.dp).shadow(4.dp, RoundedCornerShape(24.dp)).background(colors.surface, RoundedCornerShape(24.dp)).padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { controller.command("new") }, enabled = !busy && state.ready) {
+                            ChatIcon("compose", colors.onSurface, description = label("新对话", "New conversation"))
                         }
-                        ConversationDropdown(controller, sessions, onDismiss = { sessions = false })
+                        SpeechPlaybackToggle(controller)
+                        Box {
+                            IconButton(onClick = { sessions = true }, enabled = !busy) {
+                                ChatIcon("more", colors.onSurface, description = label("会话管理", "Manage conversations"))
+                            }
+                            ChatMenuCard(controller, sessions, onDismiss = { sessions = false })
+                        }
                     }
-                    SpeechPlaybackToggle(controller)
-
                 }
                 if (state.needsAccessibility) {
                     TextButton(onClick = { controller.command("accessibility") }, modifier = Modifier.fillMaxWidth()) {
@@ -134,6 +152,7 @@ fun ChatScreen(controller: ChatController, compact: Boolean = false, voiceConnec
                 }
                 if (controller.voiceState.active || voiceConnecting) VoiceConversationPanel(controller, connecting = voiceConnecting) else ChatComposer(controller)
             }
+            ChatDrawer(controller, drawer) { drawer = false }
             run {
                 RecordingFeedback(controller.willCancel, controller.willSend,
                     if (controller.transcribing) label("正在转文字…", "Transcribing…")
@@ -201,6 +220,99 @@ internal fun ChatIcon(kind: String, color: Color, modifier: Modifier = Modifier,
                     androidx.compose.ui.geometry.CornerRadius(2 * unit), style = Stroke(2 * unit))
                 for (x in listOf(6f, 10f, 14f, 18f)) line(x, 9f, x, 10f)
                 line(6f, 15f, 18f, 15f)
+            }
+            "menu" -> { line(4f, 8f, 20f, 8f); line(4f, 16f, 13f, 16f) }
+            "more" -> { drawCircle(color, 1.6f * unit, point(12f, 5f)); drawCircle(color, 1.6f * unit, point(12f, 12f)); drawCircle(color, 1.6f * unit, point(12f, 19f)) }
+            "compose" -> {
+                drawRoundRect(color, point(3f, 5f), androidx.compose.ui.geometry.Size(15 * unit, 16 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(4 * unit), style = Stroke(1.8f * unit))
+                line(11f, 14f, 20f, 5f); line(20f, 5f, 21f, 4f)
+                line(10f, 14f, 11f, 11f); line(10f, 14f, 13f, 13f)
+            }
+            "copy" -> {
+                drawRoundRect(color, point(8f, 8f), androidx.compose.ui.geometry.Size(12 * unit, 12 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(3 * unit), style = Stroke(1.8f * unit))
+                val back = Path().apply { moveTo(16 * unit, 5 * unit); lineTo(16 * unit, 4 * unit); lineTo(5 * unit, 4 * unit); lineTo(4 * unit, 5 * unit); lineTo(4 * unit, 16 * unit); lineTo(5 * unit, 16 * unit); lineTo(8 * unit, 16 * unit) }
+                drawPath(back, color, style = Stroke(1.8f * unit, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            }
+            "speaker" -> {
+                val cone = Path().apply { moveTo(4 * unit, 9.5f * unit); lineTo(8 * unit, 9.5f * unit); lineTo(13 * unit, 5 * unit); lineTo(13 * unit, 19 * unit); lineTo(8 * unit, 14.5f * unit); lineTo(4 * unit, 14.5f * unit); close() }
+                drawPath(cone, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round))
+                line(16f, 9f, 16f, 15f); line(19f, 6.5f, 19f, 17.5f)
+            }
+            "refresh" -> {
+                drawArc(color, 40f, 290f, false, point(5f, 5f), androidx.compose.ui.geometry.Size(14 * unit, 14 * unit), style = Stroke(1.8f * unit, cap = StrokeCap.Round))
+                line(17f, 3.5f, 17.5f, 7.5f); line(17.5f, 7.5f, 13.5f, 7.5f)
+            }
+            "share" -> {
+                drawCircle(color, 2.6f * unit, point(17.5f, 5.5f), style = Stroke(1.8f * unit))
+                drawCircle(color, 2.6f * unit, point(6.5f, 12f), style = Stroke(1.8f * unit))
+                drawCircle(color, 2.6f * unit, point(17.5f, 18.5f), style = Stroke(1.8f * unit))
+                line(8.8f, 10.8f, 15.2f, 6.8f); line(8.8f, 13.2f, 15.2f, 17.2f)
+            }
+            "pin" -> {
+                val head = Path().apply { moveTo(14 * unit, 3.5f * unit); lineTo(20.5f * unit, 10 * unit); lineTo(17.5f * unit, 11 * unit); lineTo(13.5f * unit, 15 * unit); lineTo(13 * unit, 18 * unit); lineTo(6 * unit, 11 * unit); lineTo(9 * unit, 10.5f * unit); lineTo(13 * unit, 6.5f * unit); close() }
+                drawPath(head, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round)); line(9.5f, 14.5f, 4f, 20f)
+            }
+            "pencil" -> {
+                val body = Path().apply { moveTo(4 * unit, 20 * unit); lineTo(5.2f * unit, 15 * unit); lineTo(16 * unit, 4.2f * unit); lineTo(19.8f * unit, 8 * unit); lineTo(9 * unit, 18.8f * unit); close() }
+                drawPath(body, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round)); line(13.5f, 6.8f, 17.2f, 10.5f)
+            }
+            "trash" -> {
+                line(4.5f, 7f, 19.5f, 7f); line(9f, 7f, 9f, 4.5f); line(9f, 4.5f, 15f, 4.5f); line(15f, 4.5f, 15f, 7f)
+                val can = Path().apply { moveTo(6.5f * unit, 7 * unit); lineTo(7.5f * unit, 20 * unit); lineTo(16.5f * unit, 20 * unit); lineTo(17.5f * unit, 7 * unit) }
+                drawPath(can, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round)); line(10.2f, 11f, 10.2f, 16f); line(13.8f, 11f, 13.8f, 16f)
+            }
+            "sparkle" -> {
+                val star = Path().apply { moveTo(12 * unit, 3 * unit); cubicTo(12.8f * unit, 8.5f * unit, 15.5f * unit, 11.2f * unit, 21 * unit, 12 * unit)
+                    cubicTo(15.5f * unit, 12.8f * unit, 12.8f * unit, 15.5f * unit, 12 * unit, 21 * unit)
+                    cubicTo(11.2f * unit, 15.5f * unit, 8.5f * unit, 12.8f * unit, 3 * unit, 12 * unit)
+                    cubicTo(8.5f * unit, 11.2f * unit, 11.2f * unit, 8.5f * unit, 12 * unit, 3 * unit); close() }
+                drawPath(star, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round))
+            }
+            "wifi" -> {
+                for (r in listOf(4f, 8f, 12f)) drawArc(color, 225f, 90f, false, point(12f - r, 19f - r), androidx.compose.ui.geometry.Size(2 * r * unit, 2 * r * unit), style = Stroke(1.8f * unit, cap = StrokeCap.Round))
+                drawCircle(color, 1.3f * unit, point(12f, 19f))
+            }
+            "sun" -> {
+                drawCircle(color, 4f * unit, point(12f, 12f), style = Stroke(1.8f * unit))
+                for (a in 0 until 8) { val t = Math.toRadians(a * 45.0); line(12f + 7f * Math.cos(t).toFloat(), 12f + 7f * Math.sin(t).toFloat(), 12f + 9.5f * Math.cos(t).toFloat(), 12f + 9.5f * Math.sin(t).toFloat()) }
+            }
+            "phone" -> {
+                drawRoundRect(color, point(6.5f, 2.5f), androidx.compose.ui.geometry.Size(11 * unit, 19 * unit), androidx.compose.ui.geometry.CornerRadius(3 * unit), style = Stroke(1.8f * unit))
+                line(10.5f, 18.5f, 13.5f, 18.5f)
+            }
+            "clock" -> { drawCircle(color, 9f * unit, point(12f, 12f), style = Stroke(1.8f * unit)); line(12f, 7f, 12f, 12f); line(12f, 12f, 15.5f, 14f) }
+            "info" -> { drawCircle(color, 9f * unit, point(12f, 12f), style = Stroke(1.8f * unit)); line(12f, 11f, 12f, 16.5f); drawCircle(color, 1.1f * unit, point(12f, 7.8f)) }
+            "close" -> { line(6f, 6f, 18f, 18f); line(18f, 6f, 6f, 18f) }
+            "chevron" -> { line(9f, 5f, 15f, 12f); line(15f, 12f, 9f, 19f) }
+            "camera" -> {
+                drawRoundRect(color, point(3f, 7f), androidx.compose.ui.geometry.Size(18 * unit, 13 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(3 * unit), style = Stroke(1.8f * unit))
+                line(8f, 7f, 9.5f, 4f); line(9.5f, 4f, 14.5f, 4f); line(14.5f, 4f, 16f, 7f)
+                drawCircle(color, 3.5f * unit, point(12f, 13.5f), style = Stroke(1.8f * unit))
+            }
+            "photo" -> {
+                drawRoundRect(color, point(3f, 4f), androidx.compose.ui.geometry.Size(18 * unit, 16 * unit),
+                    androidx.compose.ui.geometry.CornerRadius(3 * unit), style = Stroke(1.8f * unit))
+                drawCircle(color, 1.8f * unit, point(9f, 10f), style = Stroke(1.8f * unit))
+                line(4f, 18f, 10f, 13f); line(10f, 13f, 14f, 16f); line(14f, 16f, 20f, 11f)
+            }
+            "file" -> {
+                val page = Path().apply {
+                    moveTo(6 * unit, 3 * unit); lineTo(14 * unit, 3 * unit); lineTo(19 * unit, 8 * unit)
+                    lineTo(19 * unit, 21 * unit); lineTo(6 * unit, 21 * unit); close()
+                }
+                drawPath(page, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round))
+                line(14f, 3f, 14f, 8f); line(14f, 8f, 19f, 8f); line(12.5f, 17f, 12.5f, 11f)
+                line(10f, 13.5f, 12.5f, 11f); line(15f, 13.5f, 12.5f, 11f)
+            }
+            "bolt" -> {
+                val bolt = Path().apply {
+                    moveTo(13 * unit, 2 * unit); lineTo(5 * unit, 13 * unit); lineTo(11 * unit, 13 * unit)
+                    lineTo(10 * unit, 22 * unit); lineTo(19 * unit, 10 * unit); lineTo(13 * unit, 10 * unit); close()
+                }
+                drawPath(bolt, color, style = Stroke(1.8f * unit, join = StrokeJoin.Round))
             }
         }
     }
