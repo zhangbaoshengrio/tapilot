@@ -478,6 +478,17 @@ class MidsceneAccessibilityService : AccessibilityService() {
         dispatchManagedGesture(description, "Pinch gesture", callback)
     }
 
+    /** Gesture in physical screen pixels; used by the text-based screen tools. */
+    internal fun physicalGesture(startX: Float, startY: Float, endX: Float, endY: Float, duration: Long, callback: (Result<Unit>) -> Unit) {
+        val path = Path().apply {
+            moveTo(startX, startY)
+            if (startX != endX || startY != endY) lineTo(endX, endY)
+        }
+        val description = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, duration.coerceAtLeast(1))).build()
+        dispatchManagedGesture(description, "Gesture", callback)
+    }
+
     private fun dispatchManagedGesture(description: GestureDescription, name: String, callback: (Result<Unit>) -> Unit) {
         val lease = runCatching { gestureInput.acquire() }.getOrElse { callback(Result.failure(it)); return }
         var completed = false

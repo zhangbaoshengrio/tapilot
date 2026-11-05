@@ -25,5 +25,6 @@ internal data class AgentCallbacks(
     val complete: (JSONArray, JSONArray) -> JSONObject,
     val phone: (PhoneOperation) -> PhoneResult,
     val findApps: (String) -> JSONArray,
+    val screen: (JSONObject) -> JSONObject,
     val event: (JSONObject) -> Unit,
 )

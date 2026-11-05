@@ -50,6 +50,7 @@ internal class ConversationTaskRunner(
         val reports = JSONArray()
         val operations = JSONArray()
         var phoneStarted = input.phoneStarted
+        var screenConfirmed = false
         var phase = ""
         fun checkActive() { if (stopped()) throw TaskFailure("task_stopped") }
         fun rememberReports(run: JSONObject, instruction: String = "") {
@@ -99,6 +100,31 @@ internal class ConversationTaskRunner(
                         complete(chat, tools)
                     },
                     findApps = { query -> checkActive(); PhoneOperationRoute.findApps(services.capabilities().optJSONArray("apps") ?: JSONArray(), query) },
+                    screen = { request ->
+                        checkActive()
+                        val service = lifeos.md.tapilot.accessibility.MidsceneAccessibilityService.current()
+                            ?: error(appText("请在无障碍设置中开启设备控制", "Enable device control in Accessibility settings"))
+                        val acting = request.getString("op") == "act"
+                        if (acting && !screenConfirmed) {
+                            emit(TaskRunEvent.Progress(TaskStage.PREPARING_PHONE, request.optString("action"), true))
+                            confirm(request.optString("action"))
+                            checkActive()
+                            screenConfirmed = true
+                        }
+                        if (!phoneStarted) {
+                            services.navigate(if (input.global || !acting) TaskNavigation.PREVIOUS_APP else TaskNavigation.HOME)
+                            phoneStarted = true
+                        }
+                        if (acting) { emit(TaskRunEvent.Progress(TaskStage.OPERATING_PHONE, request.optString("action"))); services.status(TaskExecutionStatus.RUNNING) }
+                        checkActive()
+                        val tree = if (acting) lifeos.md.tapilot.accessibility.ScreenTree.act(service, request)
+                            else lifeos.md.tapilot.accessibility.ScreenTree.read(service)
+                        checkActive()
+                        operations.put(JSONObject().put("instruction", if (acting) request.optString("action") + " " + request.optString("id") else "read screen")
+                            .put("success", true).put("result", "app=" + tree.optString("app") + " nodes=" + tree.optInt("count")))
+                        emit(TaskRunEvent.Operation(JSONArray(reports.toString()), JSONArray(operations.toString())))
+                        tree
+                    },
                     phone = { operation ->
                         checkActive()
                         emit(TaskRunEvent.Progress(TaskStage.PREPARING_PHONE, operation.instruction, true))

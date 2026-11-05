@@ -30,7 +30,7 @@ internal class NativePiConversation(context: Context) : ConversationAgent {
     }
     override fun run(input: AgentInput, stopped: () -> Boolean, callbacks: AgentCallbacks): JSONObject {
         val (messages, resume, limits, resumeInputs, goal, userInput, language) = input
-        val (complete, phone, findApps, event) = callbacks
+        val (complete, phone, findApps, screen, event) = callbacks
         if (stopped()) throw TaskFailure("task_stopped")
         val timings = JSONObject()
         val traceId = java.util.UUID.randomUUID().toString()
@@ -98,6 +98,7 @@ internal class NativePiConversation(context: Context) : ConversationAgent {
                                     "model.complete" -> complete(args.getJSONArray("messages"), args.getJSONArray("tools"))
                                     "phone.execute" -> phone(PhoneOperation.from(args)).json()
                                     "phone.findApps" -> JSONObject().put("apps", findApps(args.getString("query")))
+                                    "phone.screen" -> screen(args)
                                     else -> error(appText("未知 Agent 请求", "Unknown agent request"))
                                 }
                             }
