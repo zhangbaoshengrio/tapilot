@@ -474,13 +474,8 @@ class NodeTestRunCoordinator(
             ?.forEach { stale -> stale.deleteRecursively() }
     }
 
-    private fun screenshotExperimentEnvironment(): Map<String, String> {
-        val debuggable = appContext.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE != 0
-        val factor = if (debuggable) appContext.getSharedPreferences("tapilot-performance", Context.MODE_PRIVATE)
-            .getString("screenshot-shrink-factor", "1") else "1"
-        require(factor in listOf("1", "1.5")) { "Unsupported screenshot experiment factor" }
-        return mapOf("TAPILOT_SCREENSHOT_SHRINK_FACTOR" to factor!!)
-    }
+    private fun screenshotExperimentEnvironment(): Map<String, String> =
+        mapOf("TAPILOT_SCREENSHOT_SHRINK_FACTOR" to lifeos.md.tapilot.settings.ScreenshotQuality.shrinkFactor(appContext))
 
     override fun close() {
         stop()

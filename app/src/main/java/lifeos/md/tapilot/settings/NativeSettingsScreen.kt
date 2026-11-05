@@ -56,6 +56,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
     var floating by remember { mutableStateOf(FloatingBallPreferences.isEnabled(activity)) }
     var edge by remember { mutableStateOf(EdgeEffectPreferences.get(activity)) }
     var page by remember { mutableStateOf("") }
+    var shots by remember { mutableStateOf(ScreenshotQuality.get(activity)) }
     var effort by remember { mutableStateOf(lifeos.md.tapilot.chatgpt.ChatGptResponses.reasoningEffort) }
     val busy = coordinator.settingsBusy
     TapilotTheme(dark, paletteId) {
@@ -100,6 +101,13 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                         "Conversation and phone operations use the selected connection. Both configurations are saved separately."), fontSize = 12.sp)
                 }
                 if (page == "model" && coordinator.data.optBoolean("chatgptConversation")) Group("ChatGPT (SIWC)") { ChatGptSettingsSection(coordinator, zh) }
+                if (page == "model") Group(label("截图大小", "Screenshot size")) {
+                    SettingRow(label("发给 AI 的截图", "Screenshots sent to the AI"),
+                        if (shots == "fast") label("缩小（更快）", "Smaller (faster)") else label("原始大小（更清晰）", "Full size (sharper)")) { picker = "shots" }
+                    Text(label("缩小后上传更快、识图更快，但很小的文字可能读不清。读错小字时改回原始大小。",
+                        "Smaller screenshots upload and process faster, but very small text may be misread. Switch back to full size if small text is read wrongly."),
+                        fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
                 if (page == "model" && coordinator.data.optBoolean("chatgptConversation")) Group(label("思考强度", "Thinking level")) {
                     SettingRow(label("规划思考强度", "Planning effort"), when (effort) {
                         "medium" -> label("中", "Medium"); "high" -> label("高", "High"); else -> label("低（更快）", "Low (faster)") }) { picker = "effort" }
@@ -208,6 +216,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                 "theme" -> listOf("system", "light", "dark")
                 "language" -> listOf("system", "zh", "en")
                 "effort" -> listOf("low", "medium", "high")
+                "shots" -> ScreenshotQuality.choices
                 else -> listOf("auto", "square", "custom")
             }
             AlertDialog(onDismissRequest = { picker = "" }, title = { Text(label("选择", "Choose")) }, text = {
@@ -216,6 +225,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                         "system" -> label("跟随系统", "System"); "light" -> label("浅色", "Light"); "dark" -> label("深色", "Dark")
                         "zh" -> "简体中文"; "en" -> "English"; "auto" -> label("自动检测", "Automatic")
                         "square" -> label("直角", "Square"); "custom" -> label("自定义", "Custom")
+                        "fast" -> label("缩小（更快）", "Smaller (faster)"); "sharp" -> label("原始大小（更清晰）", "Full size (sharper)")
                         "low" -> label("低（更快）", "Low (faster)"); "medium" -> label("中", "Medium"); "high" -> label("高（更慢更细致）", "High (slower, more careful)")
                         "volcengine" -> label("火山引擎", "Volcengine"); "doubao" -> label("豆包", "Doubao"); "qwen" -> label("通义千问", "Qwen"); else -> choice
                     }
@@ -225,6 +235,7 @@ fun NativeSettingsScreen(coordinator: NativeConversationCoordinator, activity: A
                             "speech" -> { provider = choice; speechKey = "" }
                             "theme" -> { AppTheme.set(activity, choice); mode = choice; onThemeChanged() }
                             "language" -> if (AppLanguage.set(activity, choice)) onLanguageChanged()
+                            "shots" -> { ScreenshotQuality.set(activity, choice); shots = choice }
                             "effort" -> { lifeos.md.tapilot.chatgpt.ChatGptResponses.saveEffort(activity, choice); effort = choice }
                             "edge" -> { edge = edge.copy(mode = EdgeEffectGeometryMode.fromWireValue(choice)); saveEdge(services, edge) }
                         }; picker = ""
