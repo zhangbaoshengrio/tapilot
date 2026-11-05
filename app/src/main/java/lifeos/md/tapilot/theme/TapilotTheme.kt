@@ -66,8 +66,8 @@ private val typography = Typography(
 internal fun TapilotTheme(dark: Boolean, paletteId: String = AppTheme.paletteId(LocalContext.current), content: @Composable () -> Unit) {
     val colors = tapilotColors(dark, paletteId)
     MaterialTheme(colorScheme = colors, typography = typography,
-        shapes = Shapes(small = RoundedCornerShape(12.dp), medium = RoundedCornerShape(18.dp),
-            large = RoundedCornerShape(24.dp), extraLarge = RoundedCornerShape(24.dp))) {
+        shapes = Shapes(small = RoundedCornerShape(10.dp), medium = RoundedCornerShape(14.dp),
+            large = RoundedCornerShape(20.dp), extraLarge = RoundedCornerShape(28.dp))) {
         CompositionLocalProvider(LocalThemePalette provides ThemePalettes.get(paletteId, dark),
             LocalContentColor provides colors.onBackground, content = content)
     }
