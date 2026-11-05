@@ -1,6 +1,6 @@
 import { RuntimeFailure } from './runtime-errors.mjs';
 
-/** Conservative request budget. Image bytes have a separate transport cap: base64 length
+/** Request budget in JSON characters (about 400k tokens at worst, one token per Chinese character). Image bytes have a separate transport cap: base64 length
  * is not a text token estimate. Durable checkpoints are never modified by projection. */
 const maxPayloadBytes = 32 * 1024 * 1024;
 export function contextSize(messages) {
@@ -12,7 +12,7 @@ function clip(text, limit) {
   const half = Math.floor(limit / 2);
   return `${text.slice(0, half)}\n[执行日志已截短；缺失结果未知，继续前核验实时画面，不能盲目重复操作]\n${text.slice(-half)}`;
 }
-export function projectContext(messages, budget = 48000, language = 'en') {
+export function projectContext(messages, budget = 400000, language = 'en') {
   if (!Number.isFinite(budget) || budget <= 0) throw new Error('Invalid context budget');
   if (Buffer.byteLength(JSON.stringify(messages)) > maxPayloadBytes)
     throw new RuntimeFailure('context_payload_limit', language);

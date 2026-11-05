@@ -240,7 +240,7 @@ import { projectContext } from './pi-context.mjs';
 test('context projection preserves constraints, failures, and complete recent tool batches', () => {
   const messages = [{role:'system',content:'system'}, {role:'user',content:'Never send messages without my approval'}];
   for (let i=0;i<30;i++) messages.push({role:'assistant',content:null,tool_calls:[{id:`c${i}`,function:{name:'operate_phone',arguments:'{"instruction":"check"}'}}]}, {role:'tool',tool_call_id:`c${i}`,content:JSON.stringify({success:i!==0,result:'start'+'.'.repeat(4000)+'end'})});
-  const projected=projectContext(messages);
+  const projected=projectContext(messages,48000);
   assert.ok(JSON.stringify(projected).length<JSON.stringify(messages).length);
   assert.ok(projected.some(m=>m.content==='Never send messages without my approval'));
   assert.ok(JSON.stringify(projected).includes('false'));
