@@ -109,8 +109,8 @@ android {
         // An older local build exercises the available-update UI against the real published feed.
         // This verification package is never distributed as a release.
         val updateVerification = providers.gradleProperty("updateVerification").isPresent
-        versionCode = if (updateVerification) 1 else 11
-        versionName = if (updateVerification) "0.1.0-update-test" else "0.1.10"
+        versionCode = if (updateVerification) 1 else 12
+        versionName = if (updateVerification) "0.1.0-update-test" else "0.1.11"
     }
 
     val releaseStore = providers.environmentVariable("TAPILOT_SIGNING_STORE")
