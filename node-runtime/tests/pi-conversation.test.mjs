@@ -34,7 +34,7 @@ test('Pi pushes a planned phone task to verified completion through native RPC',
   const conversation = createConversation({ language: 'zh', messages: input('打开计算器'), rpc: async (method, params) => {
     methods.push(method);
     if (method === 'phone.execute') return { success: true, result: '计算器已显示' };
-    assert.deepEqual(params.tools.map(t => t.function.name), ['operate_phone', 'read_screen', 'screen_action', 'find_apps', 'set_plan', 'finish_task', 'answer_question']);
+    assert.deepEqual(params.tools.map(t => t.function.name), ['operate_phone', 'read_screen', 'screen_action', 'list_routines', 'run_routine', 'save_routine', 'find_apps', 'set_plan', 'finish_task', 'answer_question']);
     assert.deepEqual(params.tools[0].function.parameters.required, ['instruction', 'success_condition', 'mode', 'finishWhenVerified', 'app']);
     if (count === 2) {
       const verified = JSON.parse(params.messages.at(-1).content).result;

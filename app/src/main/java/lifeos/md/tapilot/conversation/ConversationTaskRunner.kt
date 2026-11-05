@@ -100,11 +100,37 @@ internal class ConversationTaskRunner(
                         complete(chat, tools)
                     },
                     findApps = { query -> checkActive(); PhoneOperationRoute.findApps(services.capabilities().optJSONArray("apps") ?: JSONArray(), query) },
-                    screen = { request ->
+                    screen = screen@{ request ->
                         checkActive()
                         val service = lifeos.md.tapilot.accessibility.MidsceneAccessibilityService.current()
                             ?: error(appText("请在无障碍设置中开启设备控制", "Enable device control in Accessibility settings"))
-                        val acting = request.getString("op") == "act"
+                        val requestOp = request.getString("op")
+                        if (requestOp.startsWith("routine.")) {
+                            val routines = lifeos.md.tapilot.accessibility.Routines
+                            return@screen when (requestOp) {
+                                "routine.list" -> routines.list(service)
+                                "routine.save" -> routines.save(service, request)
+                                "routine.run" -> {
+                                    if (!screenConfirmed) {
+                                        emit(TaskRunEvent.Progress(TaskStage.PREPARING_PHONE, request.optString("name"), true))
+                                        confirm(request.optString("name"))
+                                        checkActive()
+                                        screenConfirmed = true
+                                    }
+                                    phoneStarted = true
+                                    emit(TaskRunEvent.Progress(TaskStage.OPERATING_PHONE, request.optString("name")))
+                                    services.status(TaskExecutionStatus.RUNNING)
+                                    val outcome = routines.run(service, request.getString("name")) { stopped() }
+                                    checkActive()
+                                    operations.put(JSONObject().put("instruction", "routine " + request.optString("name"))
+                                        .put("success", outcome.optBoolean("success")).put("result", outcome.toString().take(400)))
+                                    emit(TaskRunEvent.Operation(JSONArray(reports.toString()), JSONArray(operations.toString())))
+                                    outcome
+                                }
+                                else -> error("Unknown routine request: $requestOp")
+                            }
+                        }
+                        val acting = requestOp == "act"
                         if (acting && !screenConfirmed) {
                             emit(TaskRunEvent.Progress(TaskStage.PREPARING_PHONE, request.optString("action"), true))
                             confirm(request.optString("action"))
