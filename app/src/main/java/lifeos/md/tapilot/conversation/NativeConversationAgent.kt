@@ -43,16 +43,22 @@ object NativeConversationAgent {
             "When asked to check each calculation step, use a separate operate_phone for each intermediate result that must be retained, with finishWhenVerified=false. Verify and record that result before continuing. Verify the final operation and actual result on its own screen, then combine it with independently verified earlier readings in the conversation. Do not require the full expression or all intermediate steps to remain visible together unless the user explicitly requested that display. Unverified earlier steps remain unknown; mental arithmetic cannot supply missing phone evidence."
         val list = JSONArray().put(JSONObject().put("role", "system").put("content", "$prompt\n\n$speechContext\n\n$calculationContext\n\n$intermediateCalculations"))
         history.sortedBy { it.optLong("createdAt") }.filter {
-            it.optString("kind", "task") == "task" && (it.optString("reply").isNotBlank() || it.optString("status") == "stopped") && it.optString("status") != "running"
+            it.optString("kind", "task") == "task" && (it.optString("reply").isNotBlank() || it.optString("detail").isNotBlank() || it.optString("status") == "stopped") && it.optString("status") !in setOf("running", "queued")
         }.forEach { entry ->
             val file = attachments[entry.getString("id")]
             val text = entry.optString("source") + if (file?.optString("text").isNullOrBlank()) "" else "\n\n文件内容：\n${file!!.optString("text").take(30_000)}"
             list.put(user(text, file?.optJSONArray("images")?.strings().orEmpty()))
             history.filter { it.optString("kind") == "instruction" && it.optString("taskId") == entry.getString("id") }
                 .sortedBy { it.optLong("createdAt") }.forEach { list.put(user(it.optString("source"), emptyList())) }
-            list.put(JSONObject().put("role", "assistant").put("content", if (entry.optString("status") == "stopped") {
-                (if (chinese) "用户已打断此轮，不能当作任务完成。已返回的手机操作记录：" else "The user interrupted this turn; the task is not complete. Returned phone operation records: ") + entry.optJSONArray("completedOperations").let { it?.toString() ?: "[]" }
-            } else entry.getString("reply")))
+            val operations = entry.optJSONArray("completedOperations")?.takeIf { it.length() > 0 }?.toString()?.take(6_000)
+            val status = entry.optString("status")
+            val body = when {
+                status == "stopped" -> (if (chinese) "用户已打断此轮，不能当作任务完成。已返回的手机操作记录：" else "The user interrupted this turn; the task is not complete. Returned phone operation records: ") + (operations ?: "[]")
+                status == "failed" -> (if (chinese) "此轮任务失败：" else "This turn failed: ") + entry.optString("detail").take(1_000) +
+                    (operations?.let { (if (chinese) "\n失败前的手机操作记录：" else "\nPhone operation records before the failure: ") + it } ?: "")
+                else -> entry.optString("reply") + (operations?.let { (if (chinese) "\n\n[本轮手机操作记录，供后续追问参考]\n" else "\n\n[Phone operation records from this turn, for follow-up questions]\n") + it } ?: "")
+            }
+            list.put(JSONObject().put("role", "assistant").put("content", body))
         }
         return list.put(user(source, images))
     }
