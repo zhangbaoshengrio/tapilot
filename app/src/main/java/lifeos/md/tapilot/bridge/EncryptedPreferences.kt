@@ -13,7 +13,22 @@ import javax.crypto.spec.GCMParameterSpec
 /** One atomic encrypted value per key, protected by an app-private Android Keystore key. */
 class EncryptedPreferences(context: Context, name: String, private val keyAlias: String) {
     private val preferences = context.getSharedPreferences(name, Context.MODE_PRIVATE)
-    @Synchronized fun get(key: String): String? = preferences.getString(key, null)?.let(::decrypt)
+    @Synchronized fun get(key: String): String? = preferences.getString(key, null)?.let { stored ->
+        try {
+            decrypt(stored)
+        } catch (error: java.security.GeneralSecurityException) {
+            discardUnreadable(key, error)
+        } catch (error: IllegalArgumentException) {
+            discardUnreadable(key, error)
+        }
+    }
+
+    /** The Keystore key no longer matches this value (e.g. it was reset), so it can never be read again. */
+    private fun discardUnreadable(key: String, error: Exception): String? {
+        android.util.Log.w("TapilotCredentials", "Dropping unreadable credential: $key", error)
+        preferences.edit().remove(key).commit()
+        return null
+    }
     @Synchronized fun keys(): Set<String> = preferences.all.keys
     @Synchronized fun set(key: String, value: String) {
         check(preferences.edit().putString(key, encrypt(value)).commit()) { "Unable to save credential" }
