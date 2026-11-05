@@ -251,6 +251,10 @@ class AppServices(
                 requestId,
                 EdgeEffectPreferences.describe(activity),
             )
+            "app.previewGestures" -> {
+                service?.previewGestures()
+                respondSuccess(requestId, JSONObject.NULL)
+            }
             "app.setEdgeEffectSettings" -> {
                 val settings = EdgeEffectGeometrySettings(
                     mode = EdgeEffectGeometryMode.fromWireValue(params.getString("mode")),

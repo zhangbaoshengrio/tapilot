@@ -41,6 +41,7 @@ class MidsceneAccessibilityService : AccessibilityService() {
     private val screenshotPacer = ScreenshotRequestPacer()
     private val cancelledSessions = ConcurrentHashMap.newKeySet<String>()
     private lateinit var taskEffects: TaskEffectController
+    private lateinit var gestureEffects: GestureEffectController
     private lateinit var floatingBall: FloatingBallController
     private val gestureInput = GestureInputGuard { floatingBall.setGesturePassThrough(it) }
     @Volatile private var latestCapture: CapturePayload? = null
@@ -63,8 +64,10 @@ class MidsceneAccessibilityService : AccessibilityService() {
         AppLanguage.apply(this)
         if (::floatingBall.isInitialized) floatingBall.close()
         if (::taskEffects.isInitialized) taskEffects.close()
+        if (::gestureEffects.isInitialized) gestureEffects.close()
         val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         taskEffects = TaskEffectController(this, windowManager, handler)
+        gestureEffects = GestureEffectController(this, windowManager, handler)
         floatingBall = FloatingBallController(this, windowManager).apply {
             setAppForeground(AppForegroundTracker.isForeground)
             setTaskRunning(TaskExecutionTracker.isActive)
@@ -157,6 +160,10 @@ class MidsceneAccessibilityService : AccessibilityService() {
 
     private fun onMain(action: () -> Unit) {
         if (Looper.myLooper() == Looper.getMainLooper()) action() else handler.post { action() }
+    }
+
+    internal fun previewGestures() {
+        if (::gestureEffects.isInitialized) gestureEffects.preview()
     }
 
     internal fun previewEdgeEffect(settings: EdgeEffectGeometrySettings) {
@@ -268,6 +275,7 @@ class MidsceneAccessibilityService : AccessibilityService() {
         // Android latches the frame so AI input and report-player frames stay
         // clean. The animator keeps advancing and resumes at its current phase.
         val queued = android.os.SystemClock.elapsedRealtime()
+        if (hideOverlays && ::gestureEffects.isInitialized) gestureEffects.clear()
         val hiddenTaskEffect = if (hideOverlays) taskEffects.hideForCapture() else null
         val hiddenFloatingBall = if (hideOverlays) floatingBall.hideForCapture() else false
         handler.postDelayed({
@@ -485,6 +493,7 @@ class MidsceneAccessibilityService : AccessibilityService() {
         // Apply overlay input changes before injecting on the next main-loop turn.
         handler.post {
             runCatching {
+                if (::gestureEffects.isInitialized) gestureEffects.show(description)
                 val accepted = dispatchGesture(description, object : GestureResultCallback() {
                     override fun onCompleted(gestureDescription: GestureDescription?) = finish(Result.success(Unit))
                     override fun onCancelled(gestureDescription: GestureDescription?) = finish(Result.failure(IllegalStateException("$name was cancelled")))
